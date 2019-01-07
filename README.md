@@ -1,4 +1,4 @@
-== Generate a 32-bit RISC-V ISA instruction decoder ==
+Generate a 32-bit RISC-V ISA instruction decoder
 
 The input file contains the binary patterns for the instructions, and what flags will be asserted by the decoder when that pattern is seen.
 
