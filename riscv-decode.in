@@ -1,0 +1,66 @@
+Fields:
+--------------------43210------- = rd
+------------43210--------------- = rs1
+-------43210-------------------- = rs2
+ONMLJKIHGFEDCBA9876543210------- = immed20
+BA9876543210-------------------- = immed12
+
+Flags:
+-------------------------0110111 = valid, type_upper20                                 # OPCODE lui
+-------------------------0010111 = valid, type_upper20, flag_pc_relative               # OPCODE auipc
+
+0000--------00000000000000001111 = valid, type_fence                                   # OPCODE fence
+00000000000000000001000000001111 = valid, type_fence                                   # OPCODE ence_i
+
+00000000000000000000000001110011 = valid, type_system                                  # OPCODE ecall
+00000000000100000000000001110011 = valid, type_system                                  # OPCODE ebreak
+
+-----------------000-----0100011 = valid, type_store, flag_store_byte                  # OPCODE sb
+-----------------001-----0100011 = valid, type_store, flag_store_half                  # OPCODE sh
+-----------------010-----0100011 = valid, type_store, flag_store_word                  # OPCODE sw
+
+-----------------000-----0000011 = valid, type_load,  flag_load_byte                   # OPCODE lbu
+-----------------001-----0000011 = valid, type_load,  flag_load_half                   # OPCODE lhu
+-----------------010-----0000011 = valid, type_load,  flag_load_word                   # OPCODE lw
+-----------------100-----0000011 = valid, type_load,  flag_load_byte, flag_sign_extend # OPCODE lbu
+-----------------101-----0000011 = valid, type_load,  flag_load_half, flag_sign_extend # OPCODE lbu
+
+0000000----------001-----0010011 = valid, type_shift, flag_sll,  flag_shift_immed      # OPCODE slli
+0000000----------101-----0010011 = valid, type_shift, flag_srl,  flag_shift_immed      # OPCODE srli
+0100000----------101-----0010011 = valid, type_shift, flag_sra,  flag_shift_immed      # OPCODE srai
+0000000----------001-----0110011 = valid, type_shift, flag_sll                         # OPCODE sll
+0000000----------101-----0110011 = valid, type_shift, flag_srl                         # OPCODE srl
+0100000----------101-----0110011 = valid, type_shift, flag_sra                         # OPCODE sra
+
+-----------------000-----0010011 = valid, type_alu, flag_add,  flag_immed              # OPCODE addi
+-----------------010-----0010011 = valid, type_alu, flag_slt,  flag_immed              # OPCODE slti
+-----------------011-----0010011 = valid, type_alu, flag_sltu, flag_immed              # OPCODE sltui
+-----------------100-----0010011 = valid, type_alu, flag_xor,  flag_immed              # OPCODE xori
+-----------------110-----0010011 = valid, type_alu, flag_or,   flag_immed              # OPCODE ori
+-----------------111-----0010011 = valid, type_alu, flag_and,  flag_immed              # OPCODE andi
+
+0000000----------000-----0110011 = valid, type_alu, flag_add                           # OPCODE add
+0100000----------000-----0110011 = valid, type_alu, flag_sub                           # OPCODE sub
+0000000----------010-----0110011 = valid, type_alu, flag_slt                           # OPCODE slt
+0000000----------011-----0110011 = valid, type_alu, flag_sltu                          # OPCODE sltu
+0000000----------100-----0110011 = valid, type_alu, flag_xor                           # OPCODE xor
+0000000----------110-----0110011 = valid, type_alu, flag_or                            # OPCODE or
+0000000----------111-----0110011 = valid, type_alu, flag_and                           # OPCODE and
+
+-----------------000-----1100011 = valid, type_cond_jump, flag_equal                   # OPCODE beq
+-----------------001-----1100011 = valid, type_cond_jump, flag_equal, flag_invert      # OPCODE bne
+-----------------100-----1100011 = valid, type_cond_jump, flag_lt                      # OPCODE blt
+-----------------101-----1100011 = valid, type_cond_jump, flag_lt,    flag_invert      # OPCODE bge
+-----------------110-----1100011 = valid, type_cond_jump, flag_ltu                     # OPCODE bltu
+-----------------111-----1100011 = valid, type_cond_jump, flag_ltu,   flag_invert      # OPCODE bgeu
+
+-----------------000-----1100111 = valid, type_jump, flag_jalr                         # OPCODE jalr
+-------------------------1101111 = valid, type_jump, flag_jal                          # OPCODE jal
+
+-----------------001-----1110011 = valid, type_csr, flag_csrrw                         # OPCODE csrrw
+-----------------010-----1110011 = valid, type_csr, flag_csrrs                         # OPCODE csrrs
+-----------------011-----1110011 = valid, type_csr, flag_csrrc                         # OPCODE csrrc
+-----------------101-----1110011 = valid, type_csr, flag_csrrw, flag_csr_immed         # OPCODE csrrwi
+-----------------110-----1110011 = valid, type_csr, flag_csrrs, flag_csr_immed         # OPCODE csrrsi
+-----------------111-----1110011 = valid, type_csr, flag_csrrc, flag_csr_immed         # OPCODE csrrci
+
