@@ -8,8 +8,15 @@ static char arch_name[] = "auto_generated_code";
 static char inst_name[] = "inst";
 char buffer[1024];
 int mode;
-#define MODE_FIELDS 1
-#define MODE_FLAGS 2
+#define MODE_SLICES 1
+#define MODE_FLAGS  2
+
+struct Slice {
+  struct Slice *next;
+  char *name;
+  uint32_t width;
+  uint8_t *indexes;
+};
 
 struct Product {
   struct Product *next;
@@ -36,6 +43,7 @@ struct Pattern {
   struct Flag_List *flag_list;
 };
 
+struct Slice   *first_slice;
 struct Pattern *first_pattern;
 struct Flag    *first_flag;
 
@@ -209,6 +217,50 @@ struct Pattern *add_pattern(uint32_t mask, uint32_t value, struct Flag_List *fla
 }
 
 /****************************************************************************/
+struct Slice *add_slice(char *name, int len, uint8_t width) {
+  struct Slice *s;
+  s = malloc(sizeof(struct Slice));
+  if(s == NULL) {
+    fprintf(stderr, "Out of memory\n");
+    return NULL;
+  }
+  memset(s,0,sizeof(struct Slice));
+  s->name  = malloc(len+1);
+  s->width = width;
+  if(s->name == NULL) {
+    free(s);
+    fprintf(stderr, "Out of memory\n");
+    return NULL;
+  }
+  memcpy(s->name,name,len);
+  s->name[len] = 0;
+
+  s->indexes = malloc(sizeof(uint8_t) * width);
+  if(s->indexes == NULL) {
+    fprintf(stderr, "Out of memory\n");
+    free(s->name);
+    free(s);
+    return NULL;
+  }
+  memset(s->indexes, 0xFF, sizeof(uint8_t) * width);
+
+  if(first_slice == NULL || strcmp(s->name, first_slice->name) < 0) { 
+    // Insert at head of list
+    s->next = first_slice; 
+    first_slice = s;
+  } else { 
+    struct Slice *c = first_slice;
+    // find where we need to insert it
+    while(c->next != NULL && strcmp(s->name, c->next->name) > 0) {
+      c = c->next;
+    }
+    // Insert into list
+    s->next = c->next;
+    c->next = s;
+  }
+  return s;
+}
+/****************************************************************************/
 int parse_line(void) {
   char *ptr = buffer;
   int i=0;
@@ -223,8 +275,8 @@ int parse_line(void) {
   if(*ptr == '#' || *ptr == '\0')
     return 1;
 
-  if(strncmp(ptr,"Fields:",7) == 0) {
-    mode = MODE_FIELDS;
+  if(strncmp(ptr,"Slices:",7) == 0) {
+    mode = MODE_SLICES;
     return 1;
   }
   if(strncmp(ptr,"Flags:",6) == 0) {
@@ -354,7 +406,106 @@ int parse_line(void) {
         return 0;
       }
       return 1;
-    case MODE_FIELDS:
+    case MODE_SLICES:
+      {
+        int len = 0;
+	int width = 1;
+	struct Slice *s;
+
+        if(!symbol_first_char(ptr[len])) {
+          fprintf(stderr,"Invalid Symbol character '%c'\n", ptr[len]);
+          return 0;
+        }
+        len++;
+        while(symbol_char(ptr[len]))
+          len++;
+	ptr += len;
+
+        while(*ptr == ' ')
+	  ptr++;
+
+	if(*ptr != '(') {
+          fprintf(stderr,"Expected '(' got '%c'\n", *ptr);
+          return 0;
+	}
+	ptr++;
+
+        while(*ptr == ' ')
+	   ptr++;
+	   
+	if((ptr[0] >= '1' && ptr[0] <= '9') && (ptr[1] >= '0' && ptr[1] <= '9')) {
+	  width =  (ptr[0] - '0')*10 + ptr[1] - '0';
+	  ptr += 2;
+	} else if(ptr[0] >= '1' && ptr[0] <= '9') {
+	  width =  ptr[0] - '0';
+	  ptr++;
+	} else {
+          fprintf(stderr,"Expected a two-digit width\n");
+          return 0;
+	}
+
+        while(*ptr == ' ')
+	   ptr++;
+	   
+	if(*ptr != ')') {
+          fprintf(stderr,"Expected ')'\n");
+          return 0;
+	}
+	ptr++;
+	
+        while(*ptr == ' ')
+	   ptr++;
+	   
+	if(*ptr != '=') {
+          fprintf(stderr,"Expected '='\n");
+          return 0;
+	}
+	ptr++;
+
+        while(*ptr == ' ')
+	   ptr++;
+	  
+        for(i = 0; i < 32; i++) {
+	  if((ptr[i] < '0' && ptr[i] > '9') && (ptr[i] < 'a' && ptr[i] > 'z') && (ptr[i] < 'A' && ptr[i] > 'Z') && ptr[i] != '-') {
+	    fprintf(stderr, "Expecting a 32-bit slice discription\n");
+	    return 0;
+	  }
+	}	
+	// eat whitespace
+	while(ptr[i] == ' ')
+	   i++;
+	if(ptr[i] != '#' && ptr[i] != '\0') {
+	    fprintf(stderr, "Expecting comment or end of line\n");
+//	    return 0;
+	}
+	s = add_slice(buffer,len,width);
+        for(i =0; i < 32; i++) {
+	  int index;
+	  if(ptr[i] >= '0' && ptr[i] <= '9') {
+	    index = ptr[i] - '0';
+	  } else if(ptr[i] >= 'a' && ptr[i] <= 'z') {
+	    index = ptr[i] - 'a' + 10;
+	  } else if(ptr[i] >= 'A' && ptr[i] <= 'Z') {
+	    index = ptr[i] - 'A' + 10;
+	  } else {
+            index = 0xFF;
+	  }
+
+
+	  if(index != 0xFF) {
+	    if(index >= width) {
+	      fprintf(stderr, "Index '%c' (%i) is out of slice\n", ptr[i], index);
+	      return 0;
+	    } else if(s->indexes[index] != 0xFF) {
+	      fprintf(stderr, "Index is assigned multiple times\n");
+	      return 0;
+	    } else {  
+	      s->indexes[index] = 31-i;
+	    }
+	  }
+	}
+	
+      }
       return 1;
     default:
       fprintf(stderr,"Not in 'Flags' or 'Fields' mode\n");
@@ -761,6 +912,7 @@ static int vhdl_emit_code_expression(FILE *file, uint32_t mask, uint32_t value) 
 static int vhdl_emit_code(char *filename) {
    FILE *file;
    struct Flag *flag;
+   struct Slice *s;
    file = fopen(filename,"w");
    if(file == NULL) {
      fprintf(stderr, "Unable to open file '%s'\n", filename);
@@ -774,6 +926,18 @@ static int vhdl_emit_code(char *filename) {
    fprintf(file, "ENTITY %s IS\n", entity_name);
    fprintf(file, "    PORT (\n");
    fprintf(file, "        %-20s : in  std_logic_vector(31 downto 0);\n",inst_name);
+
+   s = first_slice;
+   while(s != NULL) {
+	
+     if(s->next == NULL && first_flag == NULL) {
+       fprintf(file, "        %-20s : out std_logic_vector(%2i downto 0) := (others => '0'));\n", s->name, s->width-1);
+     } else {
+       fprintf(file, "        %-20s : out std_logic_vector(%2i downto 0) := (others => '0');\n", s->name, s->width-1);
+     }
+     s = s->next;
+   }
+
    flag = first_flag;
    while(flag != NULL) {
       if(flag->next == NULL) {
@@ -788,6 +952,30 @@ static int vhdl_emit_code(char *filename) {
    fprintf(file, "ARCHITECTURE %s OF %s IS\n", arch_name, entity_name);
    fprintf(file, "BEGIN\n");
    fprintf(file, "\n");
+
+   // Output the slices
+   s = first_slice;
+   while(s != NULL) {
+     int i;
+     fprintf(file, "    %-20s <= ", s->name);
+     for(i = s->width-1; i >= 0; i--) {
+       if(s->indexes[i] != 0xFF) { 
+	fprintf(file, "%s(%i)", inst_name, s->indexes[i]);
+       } else {
+	fprintf(file, "'0'");
+       }
+       if(i != 0) {
+	 fprintf(file, " & ");
+       } else {
+	 fprintf(file, ";\n");
+       }
+     } 
+     s = s->next;
+   }
+
+   fprintf(file, "\n");
+
+   // Now output all the flags
    fprintf(file, "flags_decode: PROCESS(%s)\n", inst_name);
    fprintf(file, "    BEGIN\n");
 
