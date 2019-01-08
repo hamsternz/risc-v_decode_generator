@@ -10,10 +10,10 @@ Flags:
 -------------------------0010111 = valid, type_upper20, flag_pc_relative               # OPCODE auipc
 
 0000--------00000000000000001111 = valid, type_fence                                   # OPCODE fence
-00000000000000000001000000001111 = valid, type_fence                                   # OPCODE fence_i
+00000000000000000001000000001111 = valid, type_fence, flag_fence_i                     # OPCODE fence_i
 
-00000000000000000000000001110011 = valid, type_system                                  # OPCODE ecall
-00000000000100000000000001110011 = valid, type_system                                  # OPCODE ebreak
+00000000000000000000000001110011 = valid, type_system, flag_ecall                      # OPCODE ecall
+00000000000100000000000001110011 = valid, type_system, flag_ebreak                     # OPCODE ebreak
 
 -----------------000-----0100011 = valid, type_store, flag_store_byte                  # OPCODE sb
 -----------------001-----0100011 = valid, type_store, flag_store_half                  # OPCODE sh
