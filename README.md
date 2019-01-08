@@ -11,7 +11,7 @@ All instructions must have a "type_" flag, and then zero of more "field_" flags.
 
 Do not act on "field_" flags unless the assocated "type_" flag is asserted(e.g. they select a subfunction)!
 
-As a limited example (this is hust the load instructions), this input:
+As a limited example (this is just the load instructions), this input:
 
     Flags:
     -----------------000-----0000011 = valid, type_load,  flag_load_byte                   # OPCODE lbu
