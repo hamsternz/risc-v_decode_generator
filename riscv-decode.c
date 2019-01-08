@@ -124,7 +124,7 @@ struct Product *field_add_type_product(struct Flag *f, uint32_t mask, uint32_t v
   p->mask  = mask;
   p->value = value;
 
-  // Add to the list
+  // Add to the head of the list
   p->next  = f->first_type_product;
   f->first_type_product = p;
   return p;
@@ -525,7 +525,95 @@ int flag_merge_inner(struct Flag *flag) {
   }
   return 1;
 }
+/****************************************************************************/
+void join_pattern(uint32_t a_mask, uint32_t a_value, uint32_t b_mask, uint32_t b_value,
+		  uint32_t *r_mask, uint32_t *r_value) {
+  uint32_t common_mask;
 
+  /* Just copy it over for now */
+  *r_mask  = a_mask;
+  *r_value = a_value;
+
+  common_mask = a_mask & b_mask;
+  // If any of the known bits do not match, then nothing matches.
+  if((a_value & common_mask) != (b_value & common_mask)) {
+    *r_mask  = 0;
+    *r_value = 0;
+  } else {
+    // Merge the two masks togeather 
+    *r_mask = a_mask | b_mask;
+    *r_value = (a_value & a_mask) | (b_value & b_mask);
+  }
+  return;
+}
+
+/****************************************************************************/
+void reduce_if_possible(struct Product *reducing, struct Product *type_list)
+{
+  uint32_t remove = 1<<31;
+  while(remove != 0) {
+    uint32_t mask  = reducing->mask;
+    uint32_t value = reducing->value;
+    if(reducing->mask & remove) {
+      struct Product *p;
+      mask  &= ~remove;
+      value &= ~remove;
+      p = type_list;
+      while(p != NULL) {
+	uint32_t a_mask, a_value;
+	uint32_t b_mask, b_value;
+        join_pattern(mask,          value,           p->mask, p->value, &a_mask, &a_value); 
+        join_pattern(reducing->mask,reducing->value, p->mask, p->value, &b_mask, &b_value); 
+	if(a_mask != b_mask || a_value != b_value) {
+          break;
+	}
+	p = p->next;
+      }
+      if(p == NULL) {
+//      printf("Removing %08x from %08x:%08x\n", remove, reducing->mask, reducing->value);
+        reducing->mask  &= ~remove;
+	reducing->value &= reducing->mask;
+      }
+    }
+    remove = remove >> 1;
+  }
+}
+/****************************************************************************/
+#if 0
+int single_bit_difference(uint32_t a, uint32_t b) {
+  int differences = 0;
+  int i;
+
+  for(i = 0; i < 32; i++) {
+    if(a
+  }
+}
+/****************************************************************************/
+void merge_single_bit_differences(struct Product *head) {
+  struct Product *p;
+
+  p = head;
+  while(p != NULL && p->next != NULL) {
+    struct Product *c;
+    c = p;
+    while(c->next != NULL) {
+      if(single_bit_difference(p->value & p->mask, c->next->value & c->next->mask)) {
+	struct Product *to_delete;
+	// Update the mask
+	p->mask  &= ~(p->value ^ (c->next->value);
+	p->value &= p->mask;
+      
+        // Remove the item from the list	
+        to_delete = c->next;
+	c->next = c->next->next;
+	free(to_dalete);
+      }
+      c = c->next; 
+    }
+    p = p->next;
+  }
+}
+#endif
 /****************************************************************************/
 int process(void) {
   struct Pattern *p;
@@ -612,42 +700,24 @@ int process(void) {
     p = p->next;
   }
 
-  printf("Stage 5: identify and remove common bits in the 'type' products\n");
+  printf("Stage 5: Remove redundant bits in fields\n");
   flag = first_flag;
   while(flag != NULL) {
-    struct Product *c;
-    uint32_t common_mask = 0xFFFFFFFF;
-
-    if(flag->first_type_product != NULL) {
-      // Find out which mask bits are present in all type products
-      c = flag->first_type_product;
-    
-      while(c != NULL) {
-        common_mask &= c->mask;
-        c = c->next;
-      }
-
-      // See which are common for all type products
-      if(flag->first_type_product != NULL && flag->first_type_product->next != NULL) {
-        c = flag->first_type_product->next;
-        while(c != NULL) {
-	  uint32_t same;
-  	  same = ~(flag->first_type_product->value ^ c->value);
-          same &= common_mask;
-  	  common_mask = same;
-          c = c->next;
-        }
-      }
-
-      if(common_mask != 0) {
-        // Now clear the common bits in the products
-        c = flag->first_product;
-        while(c != NULL) {
-          c->mask &= ~common_mask;
-          c = c->next;
-        }
+    if(memcmp(flag->name,"flag_",5)==0) {
+      struct Product *trying_to_reduce;
+      trying_to_reduce = flag->first_product;
+      while(trying_to_reduce != NULL) {
+	 reduce_if_possible(trying_to_reduce, flag->first_type_product);
+         trying_to_reduce = trying_to_reduce->next;  
       }
     }
+    flag = flag->next;
+  }
+
+  printf("Stage 6: Attempt to merge again\n");
+  flag = first_flag;
+  while(flag != NULL) {
+    flag_merge_inner(flag);
     flag = flag->next;
   }
 
@@ -683,10 +753,10 @@ int print_data(void) {
 }
 
 /****************************************************************************/
-static int vhdl_emit_code_expression(uint32_t mask, uint32_t value) {
+static int vhdl_emit_code_expression(FILE *file, uint32_t mask, uint32_t value) {
   int left,right;
   int first = 1;
-  printf("(");
+  fprintf(file, "(");
 
   left =  31;
   while(left >= 0 && (mask & (1<<left)) == 0)
@@ -701,70 +771,77 @@ static int vhdl_emit_code_expression(uint32_t mask, uint32_t value) {
     }
     
     if(!first)
-      printf(" AND ");
+      fprintf(file, " AND ");
     first = 0;
-    printf("(%s(%i DOWNTO %i) = \"", inst_name, left, right);
+    fprintf(file, "(%s(%i DOWNTO %i) = \"", inst_name, left, right);
     for(i = left; i>=right; i--) 
-       putchar(value & (1<<i) ? '1' : '0');
-    printf("\")");
+       putc(value & (1<<i) ? '1' : '0', file);
+    fprintf(file, "\")");
 
     left = right-1;
     while(left >= 0 && (mask & (1<<left)) == 0)
       left--;
   }
-  printf(")");
+  fprintf(file, ")");
   return 1;
 }
 /****************************************************************************/
-static int vhdl_emit_code(void) {
+static int vhdl_emit_code(char *filename) {
+   FILE *file;
    struct Flag *flag;
+   file = fopen(filename,"w");
+   if(file == NULL) {
+     fprintf(stderr, "Unable to open file '%s'\n", filename);
+     return 0;
+   } 
    
-   printf("LIBRARY ieee;\n");
-   printf("USE ieee.std_logic_1164.ALL;\n");
-   printf("\n");
-   printf("ENTITY %s IS\n", entity_name);
-   printf("    PORT (\n");
-   printf("        %-20s : in  std_logic_vector(31 downto 0);\n",inst_name);
+   fprintf(file, "LIBRARY ieee;\n");
+   fprintf(file, "USE ieee.std_logic_1164.ALL;\n");
+   fprintf(file, "\n");
+   fprintf(file, "ENTITY %s IS\n", entity_name);
+   fprintf(file, "    PORT (\n");
+   fprintf(file, "        %-20s : in  std_logic_vector(31 downto 0);\n",inst_name);
    flag = first_flag;
    while(flag != NULL) {
       if(flag->next == NULL) {
-         printf("        %-20s : out std_logic := '0');\n", flag->name);    
+         fprintf(file, "        %-20s : out std_logic := '0');\n", flag->name);    
       } else {
-         printf("        %-20s : out std_logic := '0';\n", flag->name);    
+         fprintf(file, "        %-20s : out std_logic := '0';\n", flag->name);    
       }
       flag = flag->next;
    }
-   printf("END ENTITY;\n");
-   printf("\n");
-   printf("ARCHITECTURE %s OF %s IS\n", arch_name, entity_name);
-   printf("BEGIN\n");
-   printf("\n");
-   printf("flags_decode: PROCESS(%s)\n", inst_name);
-   printf("    BEGIN\n");
+   fprintf(file, "END ENTITY;\n");
+   fprintf(file, "\n");
+   fprintf(file, "ARCHITECTURE %s OF %s IS\n", arch_name, entity_name);
+   fprintf(file, "BEGIN\n");
+   fprintf(file, "\n");
+   fprintf(file, "flags_decode: PROCESS(%s)\n", inst_name);
+   fprintf(file, "    BEGIN\n");
 
    flag = first_flag;
    while(flag != NULL) {
       struct Product *product;
       // Default output to false 
-      printf("        %s <= '0';\n", flag->name);    
+      fprintf(file, "        %s <= '0';\n", flag->name);    
       product = flag->first_product;
 
       while(product != NULL) {
-	printf("        IF ");
-	vhdl_emit_code_expression(product->mask, product->value);
-	printf(" THEN\n");
-        printf("            %s <= '1';\n", flag->name);    
-	printf("        END IF;\n");
+	fprintf(file, "        IF ");
+	vhdl_emit_code_expression(file, product->mask, product->value);
+	fprintf(file, " THEN\n");
+        fprintf(file, "            %s <= '1';\n", flag->name);    
+	fprintf(file, "        END IF;\n");
 	product = product->next;
       }
-      printf("\n");
+      fprintf(file, "\n");
       flag = flag->next;
    }
 
 
-   printf("    END PROCESS;\n");
-   printf("END %s;\n", arch_name);
+   fprintf(file, "    END PROCESS;\n");
+   fprintf(file, "END %s;\n", arch_name);
 
+   fclose(file);
    return 1;
 }
 
@@ -772,6 +849,8 @@ static int vhdl_emit_code(void) {
 int main(int argc, char *argv[]) {
   FILE *f;
   int lineno;
+  char *filename;
+
   if(argc != 2) {
     fprintf(stderr,"No Input file given\n");
     return 1;
@@ -799,7 +878,17 @@ int main(int argc, char *argv[]) {
   }
 
   print_data();
-  vhdl_emit_code();
+
+  filename = malloc(strlen(entity_name)+5);
+  if(filename == NULL) {
+     fprintf(stderr,"Out ot memory\n");
+     return 0;
+  }
+  strcpy(filename,entity_name);
+  strcat(filename,".vhd");
+  vhdl_emit_code(filename);
+  free(filename);
+
   fclose(f);
   return 0;
 }
