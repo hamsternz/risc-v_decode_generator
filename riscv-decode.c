@@ -570,7 +570,6 @@ void reduce_if_possible(struct Product *reducing, struct Product *type_list)
 	p = p->next;
       }
       if(p == NULL) {
-//      printf("Removing %08x from %08x:%08x\n", remove, reducing->mask, reducing->value);
         reducing->mask  &= ~remove;
 	reducing->value &= reducing->mask;
       }
@@ -578,45 +577,12 @@ void reduce_if_possible(struct Product *reducing, struct Product *type_list)
     remove = remove >> 1;
   }
 }
-/****************************************************************************/
-#if 0
-int single_bit_difference(uint32_t a, uint32_t b) {
-  int differences = 0;
-  int i;
 
-  for(i = 0; i < 32; i++) {
-    if(a
-  }
-}
-/****************************************************************************/
-void merge_single_bit_differences(struct Product *head) {
-  struct Product *p;
-
-  p = head;
-  while(p != NULL && p->next != NULL) {
-    struct Product *c;
-    c = p;
-    while(c->next != NULL) {
-      if(single_bit_difference(p->value & p->mask, c->next->value & c->next->mask)) {
-	struct Product *to_delete;
-	// Update the mask
-	p->mask  &= ~(p->value ^ (c->next->value);
-	p->value &= p->mask;
-      
-        // Remove the item from the list	
-        to_delete = c->next;
-	c->next = c->next->next;
-	free(to_dalete);
-      }
-      c = c->next; 
-    }
-    p = p->next;
-  }
-}
-#endif
 /****************************************************************************/
 int process(void) {
   struct Pattern *p;
+  struct Flag *flag;
+
   printf("Stage 1: Check for overlapping definitions\n");
   p = first_pattern;
   while(p->next != NULL) {
@@ -650,14 +616,7 @@ int process(void) {
     p = p->next;
   }
 
-  printf("Stage 3: Perform an 'inner merge' on all flags\n");
-  struct Flag *flag = first_flag;
-  while(flag != NULL) {
-    flag_merge_inner(flag);
-    flag = flag->next;
-  }
-
-  printf("Stage 4: Attach 'type' to all fields\n");
+  printf("Stage 3: Attach 'type' to all fields\n");
   p = first_pattern;
   while(p != NULL) {
     struct Flag_List *fl;
@@ -700,6 +659,16 @@ int process(void) {
     p = p->next;
   }
 
+#if 1
+  printf("Stage 4: Perform an 'inner merge' on all flags\n");
+  flag = first_flag;
+  while(flag != NULL) {
+    flag_merge_inner(flag);
+    flag = flag->next;
+  }
+#endif
+
+#if 1
   printf("Stage 5: Remove redundant bits in fields\n");
   flag = first_flag;
   while(flag != NULL) {
@@ -713,13 +682,16 @@ int process(void) {
     }
     flag = flag->next;
   }
+#endif
 
+#if 1
   printf("Stage 6: Attempt to merge again\n");
   flag = first_flag;
   while(flag != NULL) {
     flag_merge_inner(flag);
     flag = flag->next;
   }
+#endif
 
   return 1;
 }
