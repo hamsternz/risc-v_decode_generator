@@ -794,7 +794,8 @@ static int vhdl_emit_code(char *filename) {
      fprintf(stderr, "Unable to open file '%s'\n", filename);
      return 0;
    } 
-   
+  
+   printf("Writing code to %s\n",filename); 
    fprintf(file, "LIBRARY ieee;\n");
    fprintf(file, "USE ieee.std_logic_1164.ALL;\n");
    fprintf(file, "\n");
