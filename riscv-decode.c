@@ -149,8 +149,9 @@ struct Flag *find_flag(char *name, int len) {
         break;
     }
 
-    if(f->name[i] == '\0' && (name[i] == '\0' || name[i] == ' ' || name[i] == '\t'))
+    if(f->name[i] == '\0' && (name[i] == '\0' || name[i] == ' ' || name[i] == '\t' || name[i] == ',')) {
       break;
+    }
 
     f = f->next;
   }
