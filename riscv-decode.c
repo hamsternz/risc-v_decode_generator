@@ -149,7 +149,7 @@ struct Flag *find_flag(char *name, int len) {
         break;
     }
 
-    if(f->name[i] == '\0')
+    if(f->name[i] == '\0' && (name[i] == '\0' || name[i] == ' ' || name[i] == '\t'))
       break;
 
     f = f->next;
@@ -766,7 +766,7 @@ int process(void) {
     }
     p = p->next;
   }
-
+#if 0
   printf("Stage 3: Attach 'type' to all fields\n");
   p = first_pattern;
   while(p != NULL) {
@@ -810,16 +810,13 @@ int process(void) {
     p = p->next;
   }
 
-#if 1
   printf("Stage 4: Perform an 'inner merge' on all flags\n");
   flag = first_flag;
   while(flag != NULL) {
     flag_merge_inner(flag);
     flag = flag->next;
   }
-#endif
 
-#if 1
   printf("Stage 5: Remove redundant bits in fields\n");
   flag = first_flag;
   while(flag != NULL) {
@@ -833,9 +830,7 @@ int process(void) {
     }
     flag = flag->next;
   }
-#endif
 
-#if 1
   printf("Stage 6: Attempt to merge again\n");
   flag = first_flag;
   while(flag != NULL) {
@@ -843,7 +838,6 @@ int process(void) {
     flag = flag->next;
   }
 #endif
-
   return 1;
 }
 
@@ -960,7 +954,7 @@ static int vhdl_emit_code(char *filename) {
      fprintf(file, "    %-20s <= ", s->name);
      for(i = s->width-1; i >= 0; i--) {
        if(s->indexes[i] != 0xFF) { 
-	fprintf(file, "%s(%i)", inst_name, s->indexes[i]);
+	fprintf(file, "%s(%2i)", inst_name, s->indexes[i]);
        } else {
 	fprintf(file, "'0'");
        }
